@@ -23,6 +23,20 @@ function nodeFile(name, bytes) {
   return { name, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) };
 }
 
+test("빈 수식 행을 0점 응답으로 읽지 않는다", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("설문지 응답 시트1");
+  worksheet.addRow(["타임스탬프", "점수", "이름", "학교", "본인 전화번호", "수강반", "1번"]);
+  worksheet.addRow(["2026-10-26", 0, "김학생", "한맥고", "01012345678", "상위", "1"]);
+  worksheet.getCell("H3").value = { formula: 'IFERROR("", "")', result: "" };
+
+  const bytes = await workbook.xlsx.writeBuffer();
+  const dataset = await readResponseFile(nodeFile("빈 수식 행.xlsx", Buffer.from(bytes)));
+
+  assert.equal(dataset.submissions.length, 1);
+  assert.equal(dataset.submissions[0].sourceScore, 0);
+});
+
 test("제공된 두 응답 파일을 파싱하고 비교한다", async (context) => {
   const files = await localResponseFiles();
   if (files.length < 2) return context.skip("로컬 응답 파일이 없습니다.");
