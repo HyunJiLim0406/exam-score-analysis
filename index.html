@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="응답 엑셀을 브라우저에서 안전하게 처리하는 모의고사 성적 분석 도구"
+    />
+    <title>모의고사 성적 분석</title>
+    <link rel="icon" href="./icon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="./icon.png" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="모의고사 성적 분석 홈">
+        <span>
+          <strong>모의고사 성적 분석</strong>
+        </span>
+      </a>
+      <button class="site-settings-button" id="open-achievement-settings" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.04.08V21h-4v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.08-.04H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.04-.08V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1l.08.04H21v4h-.09a1.7 1.7 0 0 0-1.51 1Z" /></svg>
+        성취도 문구 설정
+      </button>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <h1>복잡한 성적표 작업을<br /><em>한 번에 끝내세요.</em></h1>
+          <p class="hero-description">
+            응답 엑셀을 올리면 성적표를 만들고,<br class="mobile-only" /> 두 개를 올리면 주차별 변화를 비교해요.
+          </p>
+        </div>
+
+        <div class="hero-visual" aria-hidden="true">
+          <div class="trend-card">
+            <div class="trend-card-head">
+              <div><span>주차별 평균</span><strong>성적 변화</strong></div>
+              <em>최근 4주</em>
+            </div>
+            <div class="trend-bars">
+              <div><i style="--height: 42%; --color: var(--pink)"></i><span>1주</span></div>
+              <div><i style="--height: 58%; --color: var(--orange)"></i><span>2주</span></div>
+              <div><i style="--height: 71%; --color: var(--blue)"></i><span>3주</span></div>
+              <div><i style="--height: 88%; --color: var(--coral)"></i><span>4주</span></div>
+            </div>
+            <div class="trend-summary">
+              <div><span>평균 점수</span><strong>82.4점</strong><em>+6.8</em></div>
+              <div><span>성적 상승</span><strong>42명</strong></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="tool-shell" aria-label="성적표 도구">
+        <div class="mode-switch" role="tablist" aria-label="작업 선택">
+          <button class="mode-button active" type="button" data-mode="report" role="tab" aria-selected="true">
+            <span class="mode-icon coral">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 3h9l3 3v15H6z" /><path d="M14 3v4h4M9 11h6M9 15h6" />
+              </svg>
+            </span>
+            <span><strong>성적표 만들기</strong></span>
+          </button>
+          <button class="mode-button" type="button" data-mode="compare" role="tab" aria-selected="false">
+            <span class="mode-icon blue">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 19V9M12 19V5M19 19v-7" /><path d="m4 6 5-3 5 2 6-4" />
+              </svg>
+            </span>
+            <span><strong>주차별 비교</strong></span>
+          </button>
+        </div>
+
+        <div class="workspace">
+          <aside class="workspace-panel">
+            <div class="panel-heading">
+              <span class="step-number">1</span>
+              <div>
+                <p id="panel-kicker">이번 주 응답 파일</p>
+                <h2 id="panel-title">성적표를 만들 파일을 올려주세요</h2>
+              </div>
+            </div>
+
+            <div id="report-upload" class="upload-group">
+              <div class="upload-slot single-upload-slot">
+                <label class="compact-drop single-drop" for="report-file" data-drop-input="report-file">
+                  <input id="report-file" type="file" accept=".xlsx,.xls" />
+                  <span class="week-tag coral">응답 파일</span>
+                  <strong class="upload-title">엑셀 파일 선택</strong>
+                  <small class="upload-help">클릭하거나 끌어다 놓으세요</small>
+                  <span class="selected-file" hidden>
+                    <span class="file-status">선택 완료</span>
+                    <b class="chosen-file"></b>
+                    <small class="chosen-size"></small>
+                  </span>
+                </label>
+                <button class="remove-file" type="button" data-clear-input="report-file" aria-label="성적표 파일 삭제" hidden>×</button>
+              </div>
+            </div>
+
+            <div id="compare-upload" class="upload-group two-files" hidden>
+              <div class="upload-slot">
+                <label class="compact-drop" for="before-file" data-drop-input="before-file">
+                  <input id="before-file" type="file" accept=".xlsx,.xls" />
+                  <span class="week-tag pink">이전 주차</span>
+                  <strong class="upload-title">엑셀 파일 선택</strong>
+                  <small class="upload-help">클릭하거나 끌어다 놓으세요</small>
+                  <span class="selected-file" hidden>
+                    <span class="file-status">선택 완료</span>
+                    <b class="chosen-file"></b>
+                    <small class="chosen-size"></small>
+                  </span>
+                </label>
+                <button class="remove-file" type="button" data-clear-input="before-file" aria-label="이전 주차 파일 삭제" hidden>×</button>
+              </div>
+              <div class="compare-arrow">→</div>
+              <div class="upload-slot">
+                <label class="compact-drop" for="after-file" data-drop-input="after-file">
+                  <input id="after-file" type="file" accept=".xlsx,.xls" />
+                  <span class="week-tag orange">현재 주차</span>
+                  <strong class="upload-title">엑셀 파일 선택</strong>
+                  <small class="upload-help">클릭하거나 끌어다 놓으세요</small>
+                  <span class="selected-file" hidden>
+                    <span class="file-status">선택 완료</span>
+                    <b class="chosen-file"></b>
+                    <small class="chosen-size"></small>
+                  </span>
+                </label>
+                <button class="remove-file" type="button" data-clear-input="after-file" aria-label="현재 주차 파일 삭제" hidden>×</button>
+              </div>
+            </div>
+
+            <button class="primary-button" id="start-button" type="button" disabled>
+              <span id="start-label">파일 확인하기</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7" /></svg>
+            </button>
+          </aside>
+
+          <section class="preview-panel" aria-live="polite">
+            <div class="preview-topbar">
+              <div>
+                <span class="preview-label" id="preview-label">완성 예시</span>
+                <h3 id="preview-title">개인 성적표</h3>
+              </div>
+              <span class="excel-pill">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z" /><path d="M14 4v5h5M8 12l4 5M12 12l-4 5" /></svg>
+                Excel
+              </span>
+            </div>
+
+            <div id="report-preview" class="report-preview">
+              <div class="mock-report-header">
+                <div>
+                  <span>2026 모의고사 성적 분석</span>
+                  <h4>2주차 개인 성적표</h4>
+                </div>
+                <div class="student-meta"><strong>김한별</strong><span>한맥고 · 토요반</span></div>
+              </div>
+
+              <div class="score-summary">
+                <div class="big-score"><span>나의 점수</span><strong>87<small>점</small></strong></div>
+                <div class="rank-summary"><span>전체 등수</span><strong>12<small> / 87명</small></strong><em>상위 14%</em></div>
+                <div class="mini-chart" aria-hidden="true">
+                  <span style="height: 48%"></span><span style="height: 70%"></span><span style="height: 58%"></span><span class="active" style="height: 88%"></span>
+                </div>
+              </div>
+
+              <div class="subject-grid">
+                <div><span>화법과 작문</span><strong>18 / 20</strong><i style="--value: 90%"></i></div>
+                <div><span>독서</span><strong>27 / 30</strong><i style="--value: 90%"></i></div>
+                <div><span>문학</span><strong>32 / 36</strong><i style="--value: 89%"></i></div>
+                <div><span>언어</span><strong>10 / 14</strong><i style="--value: 71%"></i></div>
+              </div>
+
+              <div class="feedback-box">
+                <span>이번 주 진단</span>
+                <p>독서와 문학에서 안정적인 성취를 보였어요. 언어 영역의 오답 문항을 다시 확인해 보세요.</p>
+              </div>
+            </div>
+
+            <div id="compare-preview" class="compare-preview" hidden>
+              <div class="filter-row">
+                <label class="search-box">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 4 4" /></svg>
+                  <input id="student-search" type="search" placeholder="수강반, 이름, 학교 검색" />
+                </label>
+                <select id="status-filter" aria-label="변화 상태 필터">
+                  <option value="all">전체 변화</option>
+                  <option value="up">상승</option>
+                  <option value="same">유지</option>
+                  <option value="down">하락</option>
+                </select>
+              </div>
+
+              <div class="comparison-stats">
+                <div><span>비교 학생</span><strong>75<small>명</small></strong></div>
+                <div><span>등수 상승</span><strong class="coral-text">42<small>명</small></strong></div>
+                <div><span>평균 변화</span><strong class="blue-text">+4.8<small>점</small></strong></div>
+              </div>
+
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>학생</th><th>1주차</th><th>2주차</th><th>점수 변화</th><th>등수 변화</th></tr></thead>
+                  <tbody id="comparison-body"></tbody>
+                </table>
+                <p id="empty-state" class="empty-state" hidden>조건에 맞는 학생이 없어요.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="inline-workflow" id="inline-workflow" hidden aria-live="polite">
+        <header class="inline-workflow-header">
+          <div>
+            <span id="inline-workflow-kicker">파일 검증</span>
+            <h2 id="inline-workflow-title">주차별 비교</h2>
+          </div>
+          <div class="workflow-header-actions">
+            <button class="secondary-button restart-workflow" id="restart-workflow" type="button">파일 다시 선택</button>
+          </div>
+        </header>
+        <div class="inline-workflow-body" id="inline-workflow-body"></div>
+      </section>
+
+    </main>
+
+    <dialog class="settings-dialog" id="achievement-settings" aria-labelledby="achievement-settings-title">
+      <div class="settings-dialog-panel">
+        <header class="settings-dialog-header">
+          <div><span>개인 성적표 설정</span><h2 id="achievement-settings-title">성취도 문구 템플릿</h2><p>점수 비율에 따라 개인 성적표에 자동으로 들어갈 문구를 관리합니다.</p></div>
+          <button type="button" id="close-achievement-settings" aria-label="설정 닫기">×</button>
+        </header>
+        <div class="settings-dialog-body" id="achievement-settings-body"></div>
+        <footer class="settings-dialog-footer">
+          <button class="secondary-button" id="reset-achievement-settings" type="button">기본값 불러오기</button>
+          <span></span>
+          <button class="secondary-button" id="cancel-achievement-settings" type="button">취소</button>
+          <button class="secondary-button" id="apply-achievement-settings" type="button">이번 작업에 적용</button>
+          <button class="workflow-action" id="save-achievement-settings" type="button">저장하고 적용</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite">
+      <span></span>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+*.xlsx
+*.xls
+*.csv
+*.zip
+*.pdf
+!test/fixtures/*.xlsx
+/PRODUCT_PLAN.md
