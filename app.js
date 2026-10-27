@@ -44,6 +44,7 @@ const toolShell = $(".tool-shell");
 const workspace = $(".workspace");
 const inlineWorkflow = $("#inline-workflow");
 const restartWorkflowButton = $("#restart-workflow");
+const themeToggle = $("#theme-toggle");
 const openAchievementSettingsButton = $("#open-achievement-settings");
 const achievementSettingsDialog = $("#achievement-settings");
 const achievementSettingsBody = $("#achievement-settings-body");
@@ -74,6 +75,25 @@ const subjectOptions = [
   { value: "문학", label: "문학" },
 ];
 const areaOptions = ["화작", "언어", "매체", "인문·예술", "사회", "과학·기술", "고전 소설", "고전 시가", "현대 소설", "현대 시", "수필"];
+const themeStorageKey = "score-analysis-theme";
+const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+function applyTheme(theme, persist = false) {
+  document.documentElement.dataset.theme = theme;
+  const dark = theme === "dark";
+  themeToggle.setAttribute("aria-label", dark ? "라이트 모드로 전환" : "다크 모드로 전환");
+  themeToggle.setAttribute("title", dark ? "라이트 모드로 전환" : "다크 모드로 전환");
+  themeToggle.setAttribute("aria-pressed", String(dark));
+  if (persist) localStorage.setItem(themeStorageKey, theme);
+}
+
+applyTheme(document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+themeToggle.addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark", true);
+});
+colorScheme.addEventListener("change", (event) => {
+  if (!localStorage.getItem(themeStorageKey)) applyTheme(event.matches ? "dark" : "light");
+});
 
 const demoStudents = [
   { name: "김한별", school: "한맥고", className: "토요 1등급반", before: 68, after: 87, scoreChange: 19, rankChange: 24, status: "up" },
@@ -246,7 +266,7 @@ function showToast(message) {
 function openWorkflow(kicker, title) {
   workflowKicker.textContent = kicker;
   workflowTitle.textContent = title;
-  workflowBody.innerHTML = `<div class="loading-state"><span></span><p>엑셀 파일을 읽고 있습니다.</p></div>`;
+  workflowBody.innerHTML = `<div class="loading-state"><span></span><p>엑셀·CSV 파일을 읽고 있습니다.</p></div>`;
   workspace.hidden = true;
   toolShell.classList.add("workflow-active");
   inlineWorkflow.hidden = false;
@@ -904,7 +924,7 @@ async function withBusyButton(button, action) {
 
 function renderWorkflowError(error) {
   workflowKicker.textContent = "파일 확인 실패";
-  workflowTitle.textContent = "엑셀 파일을 읽지 못했습니다";
+  workflowTitle.textContent = "엑셀·CSV 파일을 읽지 못했습니다";
   workflowBody.innerHTML = `<div class="validation-message error">${escapeHtml(error.message || "알 수 없는 오류가 발생했습니다.")}</div>`;
   console.error(error);
 }

@@ -5,24 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="응답 엑셀을 브라우저에서 안전하게 처리하는 모의고사 성적 분석 도구"
+      content="응답 엑셀·CSV를 브라우저에서 안전하게 처리하는 모의고사 성적 분석 도구"
     />
     <title>모의고사 성적 분석</title>
     <link rel="icon" href="./icon.png" type="image/png" />
     <link rel="apple-touch-icon" href="./icon.png" />
+    <script>
+      (() => {
+        try {
+          const savedTheme = localStorage.getItem("score-analysis-theme");
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          document.documentElement.dataset.theme = savedTheme || (prefersDark ? "dark" : "light");
+        } catch {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="site-header">
       <a class="brand" href="#" aria-label="모의고사 성적 분석 홈">
+        <img src="./icon.png" alt="" />
         <span>
           <strong>모의고사 성적 분석</strong>
         </span>
       </a>
-      <button class="site-settings-button" id="open-achievement-settings" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.04.08V21h-4v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.08-.04H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.04-.08V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1l.08.04H21v4h-.09a1.7 1.7 0 0 0-1.51 1Z" /></svg>
-        성취도 문구 설정
-      </button>
+      <div class="site-header-actions">
+        <button class="theme-toggle" id="theme-toggle" type="button" aria-label="다크 모드로 전환" title="다크 모드로 전환">
+          <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" /></svg>
+          <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" /></svg>
+        </button>
+        <button class="site-settings-button" id="open-achievement-settings" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.04.08V21h-4v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.08-.04H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.04-.08V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1l.08.04H21v4h-.09a1.7 1.7 0 0 0-1.51 1Z" /></svg>
+          <span>성취도 문구 설정</span>
+        </button>
+      </div>
     </header>
 
     <main>
@@ -30,7 +48,7 @@
         <div class="hero-copy">
           <h1>복잡한 성적표 작업을<br /><em>한 번에 끝내세요.</em></h1>
           <p class="hero-description">
-            응답 엑셀을 올리면 성적표를 만들고,<br class="mobile-only" /> 두 개를 올리면 주차별 변화를 비교해요.
+            응답 엑셀·CSV를 올리면 성적표를 만들고,<br class="mobile-only" /> 두 개를 올리면 주차별 변화를 비교해요.
           </p>
         </div>
 
@@ -87,9 +105,9 @@
             <div id="report-upload" class="upload-group">
               <div class="upload-slot single-upload-slot">
                 <label class="compact-drop single-drop" for="report-file" data-drop-input="report-file">
-                  <input id="report-file" type="file" accept=".xlsx,.xls" />
+                  <input id="report-file" type="file" accept=".xlsx,.xls,.csv" />
                   <span class="week-tag coral">응답 파일</span>
-                  <strong class="upload-title">엑셀 파일 선택</strong>
+                  <strong class="upload-title">엑셀·CSV 파일 선택</strong>
                   <small class="upload-help">클릭하거나 끌어다 놓으세요</small>
                   <span class="selected-file" hidden>
                     <span class="file-status">선택 완료</span>
@@ -104,9 +122,9 @@
             <div id="compare-upload" class="upload-group two-files" hidden>
               <div class="upload-slot">
                 <label class="compact-drop" for="before-file" data-drop-input="before-file">
-                  <input id="before-file" type="file" accept=".xlsx,.xls" />
+                  <input id="before-file" type="file" accept=".xlsx,.xls,.csv" />
                   <span class="week-tag pink">이전 주차</span>
-                  <strong class="upload-title">엑셀 파일 선택</strong>
+                  <strong class="upload-title">엑셀·CSV 파일 선택</strong>
                   <small class="upload-help">클릭하거나 끌어다 놓으세요</small>
                   <span class="selected-file" hidden>
                     <span class="file-status">선택 완료</span>
@@ -119,9 +137,9 @@
               <div class="compare-arrow">→</div>
               <div class="upload-slot">
                 <label class="compact-drop" for="after-file" data-drop-input="after-file">
-                  <input id="after-file" type="file" accept=".xlsx,.xls" />
+                  <input id="after-file" type="file" accept=".xlsx,.xls,.csv" />
                   <span class="week-tag orange">현재 주차</span>
-                  <strong class="upload-title">엑셀 파일 선택</strong>
+                  <strong class="upload-title">엑셀·CSV 파일 선택</strong>
                   <small class="upload-help">클릭하거나 끌어다 놓으세요</small>
                   <span class="selected-file" hidden>
                     <span class="file-status">선택 완료</span>

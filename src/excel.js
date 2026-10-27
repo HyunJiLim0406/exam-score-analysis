@@ -31,7 +31,8 @@ function numberOf(value) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const normalized = String(value ?? "").replace(/,/g, "").trim();
   if (!normalized) return null;
-  const parsed = Number(normalized);
+  const score = normalized.match(/^([+-]?(?:\d+(?:\.\d*)?|\.\d+))\s*\/\s*[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/u);
+  const parsed = Number(score ? score[1] : normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -74,10 +75,69 @@ function findColumn(headers, matcher) {
   return null;
 }
 
+function parseCsvRows(text) {
+  const rows = [];
+  let row = [];
+  let field = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (quoted) {
+      if (character === '"') {
+        if (text[index + 1] === '"') {
+          field += '"';
+          index += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += character;
+      }
+      continue;
+    }
+
+    if (character === '"' && field === "") {
+      quoted = true;
+    } else if (character === ",") {
+      row.push(field);
+      field = "";
+    } else if (character === "\n" || character === "\r") {
+      if (character === "\r" && text[index + 1] === "\n") index += 1;
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += character;
+    }
+  }
+
+  if (quoted) throw new Error("CSV 파일의 따옴표가 올바르게 닫히지 않았습니다.");
+  if (field || row.length) {
+    row.push(field);
+    rows.push(row);
+  }
+  return rows;
+}
+
+function decodeUtf8Csv(buffer) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer).replace(/^\uFEFF/u, "");
+  } catch {
+    throw new Error("CSV 파일을 UTF-8로 읽을 수 없습니다. Google Sheets에서 CSV로 다시 다운로드해주세요.");
+  }
+}
+
 export async function readResponseFile(file) {
   const workbook = new ExcelJS.Workbook();
   const buffer = await file.arrayBuffer();
-  await workbook.xlsx.load(buffer);
+  if (/\.csv$/i.test(file.name)) {
+    const worksheet = workbook.addWorksheet("CSV");
+    parseCsvRows(decodeUtf8Csv(buffer)).forEach((row) => worksheet.addRow(row));
+  } else {
+    await workbook.xlsx.load(buffer);
+  }
   const worksheet = workbook.worksheets[0];
   if (!worksheet) throw new Error("엑셀 파일에 시트가 없습니다.");
 
@@ -441,7 +501,7 @@ export async function exportReportWorkbook(dataset, config = null) {
   }
 
   const buffer = await workbook.xlsx.writeBuffer();
-  downloadBuffer(buffer, `${dataset.fileName.replace(/\.xlsx?$/i, "")}_성적표.xlsx`);
+  downloadBuffer(buffer, `${dataset.fileName.replace(/\.(?:xlsx?|csv)$/i, "")}_성적표.xlsx`);
   return buffer;
 }
 

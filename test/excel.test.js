@@ -37,6 +37,43 @@ test("빈 수식 행을 0점 응답으로 읽지 않는다", async () => {
   assert.equal(dataset.submissions[0].sourceScore, 0);
 });
 
+test("Google Sheets UTF-8 CSV의 쉼표와 여러 줄 필드를 읽는다", async () => {
+  const csv = [
+    "안내,,,,,,,,",
+    '타임스탬프,점수,이름,학교(OO고),본인 전화번호,수강반,"개인정보 수집, 이용 동의서",1번,2번',
+    '2026-10-27,"100 / 100",김학생,한맥고,01012345678,"상위, 주말반","첫째 줄\n둘째 줄",1,2',
+  ].join("\r\n");
+  const bytes = Buffer.from(`\uFEFF${csv}`, "utf8");
+  const dataset = await readResponseFile(nodeFile("구글시트 응답.csv", bytes));
+
+  assert.equal(dataset.sheetName, "CSV");
+  assert.equal(dataset.questionCount, 2);
+  assert.equal(dataset.submissions.length, 1);
+  assert.equal(dataset.submissions[0].sourceScore, 100);
+  assert.equal(dataset.submissions[0].phone, "01012345678");
+  assert.equal(dataset.submissions[0].className, "상위, 주말반");
+  assert.equal(dataset.submissions[0].consent, "첫째 줄\n둘째 줄");
+  assert.deepEqual(dataset.submissions[0].answers, ["1", "2"]);
+});
+
+test("제공된 응답 XLSX를 CSV로 변환해도 분석 데이터가 같다", async (context) => {
+  const files = await localResponseFiles();
+  if (!files.length) return context.skip("로컬 응답 파일이 없습니다.");
+  const sourceBytes = await readFile(files[0].url);
+  const xlsxDataset = await readResponseFile(nodeFile(files[0].name, sourceBytes));
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(sourceBytes);
+  const csvBytes = Buffer.from(await workbook.csv.writeBuffer({ sheetName: workbook.worksheets[0].name }));
+  const csvDataset = await readResponseFile(nodeFile(files[0].name.replace(/\.xlsx$/i, ".csv"), csvBytes));
+  const comparable = (dataset) => dataset.submissions.map(({ sourceScore, name, school, phone, className, consent, answers }) => ({
+    sourceScore, name, school, phone, className, consent, answers,
+  }));
+
+  assert.equal(csvDataset.questionCount, xlsxDataset.questionCount);
+  assert.ok(csvDataset.submissions.every((submission) => submission.timestamp));
+  assert.deepEqual(comparable(csvDataset), comparable(xlsxDataset));
+});
+
 test("제공된 두 응답 파일을 파싱하고 비교한다", async (context) => {
   const files = await localResponseFiles();
   if (files.length < 2) return context.skip("로컬 응답 파일이 없습니다.");
@@ -138,6 +175,8 @@ test("기존 개별분석지 정보를 개인 PDF 데이터와 HTML로 구성한
   assert.equal(new Set(analyses.map((item) => item.submission.className)).size, 14);
 
   const html = buildStudentReportHtml(analyses[0], "1주차");
+  assert.match(html, /class="pdf-footer-logo"/);
+  assert.match(html, /logo\.png/);
   assert.match(html, /과목별 성적 분석/);
   assert.match(html, /세부 영역별 성적 분석/);
   assert.match(html, /문항별 분석/);

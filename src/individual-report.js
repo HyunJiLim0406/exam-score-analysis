@@ -4,6 +4,8 @@ import JSZip from "jszip";
 import { calculateDetailedResults, rankDataset } from "./excel.js";
 import { achievementLevel, overallMessage } from "./achievement-template.js";
 
+const REPORT_LOGO_URL = new URL("../logo.png", import.meta.url).href;
+
 function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -120,7 +122,7 @@ export function buildStudentReportHtml(analysis, examTitle) {
     <section><h2>문항별 분석</h2><div class="pdf-question-grid">${questionTableHtml(analysis.questions)}</div></section>
     <section class="pdf-diagnosis"><h2>과목·영역별 성취도 진단</h2><div>${analysis.diagnostics.map((area) => `<p><b>${escapeHtml(area.name)}</b><em data-level="${escapeHtml(area.level)}">${area.level}</em><span>${escapeHtml(area.message)}</span></p>`).join("")}</div></section>
     <section class="pdf-overall"><b>총평</b><p>${escapeHtml(analysis.overall)}</p></section>
-    <footer><span>개별 분석지를 통해 현재 상태를 살펴보고, 오답의 이유를 분석한 뒤 부족한 부분을 보완하세요.</span><b>상담 전화 02-2202-3292 · 수–금 14:00–22:00 · 주말 09:00–22:00</b></footer>
+    <footer><span class="pdf-footer-logo"><img src="${REPORT_LOGO_URL}" alt="한맥국어학원" /></span><span>개별 분석지를 통해 현재 상태를 살펴보고, 오답의 이유를 분석한 뒤 부족한 부분을 보완하세요.</span><b>상담 전화 02-2202-3292 · 수–금 14:00–22:00 · 주말 09:00–22:00</b></footer>
   </article>`;
 }
 
@@ -182,7 +184,7 @@ export async function exportClassReportZip(dataset, config, template, onProgress
   const renderHost = document.createElement("div");
   renderHost.className = "pdf-render-host";
   document.body.append(renderHost);
-  const examTitle = dataset.fileName.replace(/\.(xlsx?|xls)$/i, "").replace(/\s*\(응답\)\s*$/u, "");
+  const examTitle = dataset.fileName.replace(/\.(xlsx?|csv)$/i, "").replace(/\s*\(응답\)\s*$/u, "");
   try {
     const archive = await buildClassFolderArchive(analyses, (analysis) => reportPdfBytes(analysis, examTitle, renderHost), onProgress);
     const masterBlob = new Blob([archive.bytes], { type: "application/zip" });
