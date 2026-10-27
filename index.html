@@ -36,14 +36,14 @@
           <svg class="theme-icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.5 8.5 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z" /></svg>
           <svg class="theme-icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.66 6.34l1.41-1.41" /></svg>
         </button>
-        <button class="site-settings-button" id="open-achievement-settings" type="button">
+        <button class="site-settings-button" id="open-common-settings" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.04.08V21h-4v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.08-.04H3v-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.04-.08V3h4v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 .6 1l.08.04H21v4h-.09a1.7 1.7 0 0 0-1.51 1Z" /></svg>
-          <span>성취도 문구 설정</span>
+          <span>공통 설정</span>
         </button>
       </div>
     </header>
 
-    <main>
+    <main id="app-main">
       <section class="hero">
         <div class="hero-copy">
           <h1>복잡한 성적표 작업을<br /><em>한 번에 끝내세요.</em></h1>
@@ -267,22 +267,21 @@
 
     </main>
 
-    <dialog class="settings-dialog" id="achievement-settings" aria-labelledby="achievement-settings-title">
-      <div class="settings-dialog-panel">
-        <header class="settings-dialog-header">
-          <div><span>개인 성적표 설정</span><h2 id="achievement-settings-title">성취도 문구 템플릿</h2><p>점수 비율에 따라 개인 성적표에 자동으로 들어갈 문구를 관리합니다.</p></div>
-          <button type="button" id="close-achievement-settings" aria-label="설정 닫기">×</button>
+    <section class="settings-page" id="common-settings" aria-labelledby="common-settings-title" hidden>
+      <div class="settings-page-panel">
+        <header class="settings-page-header">
+          <button class="settings-back-button" type="button" id="back-common-settings">← 분석 도구로 돌아가기</button>
+          <div><span>설문·성적표 공통 설정</span><h1 id="common-settings-title">공통 설정</h1><p>Google 설문의 선택지와 개인 성적표의 평가 문구를 관리합니다.</p></div>
         </header>
-        <div class="settings-dialog-body" id="achievement-settings-body"></div>
-        <footer class="settings-dialog-footer">
-          <button class="secondary-button" id="reset-achievement-settings" type="button">기본값 불러오기</button>
+        <div class="settings-page-body" id="common-settings-body"></div>
+        <footer class="settings-page-footer">
+          <button class="secondary-button" id="reset-common-settings" type="button">현재 탭 기본값</button>
           <span></span>
-          <button class="secondary-button" id="cancel-achievement-settings" type="button">취소</button>
-          <button class="secondary-button" id="apply-achievement-settings" type="button">이번 작업에 적용</button>
-          <button class="workflow-action" id="save-achievement-settings" type="button">저장하고 적용</button>
+          <button class="secondary-button" id="cancel-common-settings" type="button">취소</button>
+          <button class="workflow-action" id="save-common-settings" type="button">저장하고 적용</button>
         </footer>
       </div>
-    </dialog>
+    </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite">
       <span></span>

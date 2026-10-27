@@ -10,15 +10,13 @@ import {
   rejectCandidate,
   validateDataset,
 } from "./src/excel.js";
-import { createDefaultAchievementTemplate } from "./src/achievement-template.js";
 import {
   achievementEditorHtml,
-  loadAchievementTemplate,
   readAchievementEditor,
-  storeAchievementTemplate,
 } from "./src/achievement-template-ui.js";
 import { downloadExamConfigWorkbook, readExamConfigFile, validateExamConfig } from "./src/exam-config.js";
 import { configuredGoogleClientId, createGoogleQuiz, requestGoogleAccessToken } from "./src/google-forms.js";
+import { createDefaultSettings, loadSettings, normalizeSettings, saveSettings } from "./src/settings-store.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -44,14 +42,15 @@ const statusFilter = $("#status-filter");
 const comparisonBody = $("#comparison-body");
 const emptyState = $("#empty-state");
 const toast = $("#toast");
+const appMain = $("#app-main");
 const toolShell = $(".tool-shell");
 const workspace = $(".workspace");
 const inlineWorkflow = $("#inline-workflow");
 const restartWorkflowButton = $("#restart-workflow");
 const themeToggle = $("#theme-toggle");
-const openAchievementSettingsButton = $("#open-achievement-settings");
-const achievementSettingsDialog = $("#achievement-settings");
-const achievementSettingsBody = $("#achievement-settings-body");
+const openCommonSettingsButton = $("#open-common-settings");
+const commonSettingsPage = $("#common-settings");
+const commonSettingsBody = $("#common-settings-body");
 const inlineWorkflowKicker = $("#inline-workflow-kicker");
 const inlineWorkflowTitle = $("#inline-workflow-title");
 const inlineWorkflowBody = $("#inline-workflow-body");
@@ -65,8 +64,11 @@ let currentComparison = null;
 let currentConfig = [];
 let formDraft = createFormDraft();
 let createdGoogleForm = null;
-let achievementTemplate = loadAchievementTemplate();
-let achievementSettingsDraft = achievementTemplate;
+let appSettings = loadSettings();
+let achievementTemplate = appSettings.achievement;
+let settingsDraft = cloneSettings(appSettings);
+let settingsTab = "form";
+let mainScrollPosition = 0;
 let comparisonPage = 1;
 const comparisonPageSize = 20;
 let comparisonResultTab = "rank-top";
@@ -89,6 +91,10 @@ function createFormDraft(questionCount = 45) {
     title: "",
     questions: Array.from({ length: questionCount }, () => ({ answer: "", points: 2, subject: "", area: "" })),
   };
+}
+
+function cloneSettings(settings) {
+  return JSON.parse(JSON.stringify(settings));
 }
 
 function applyTheme(theme, persist = false) {
@@ -313,36 +319,162 @@ function restartWorkflow() {
 
 restartWorkflowButton.addEventListener("click", restartWorkflow);
 
-function openAchievementSettings() {
-  achievementSettingsDraft = achievementTemplate;
-  achievementSettingsBody.innerHTML = achievementEditorHtml(achievementSettingsDraft);
-  achievementSettingsDialog.showModal();
+function settingsListEditorHtml() {
+  const editor = (key, title, description, reorder = false) => `<section class="settings-collection ${key === "schools" ? "school-collection" : ""}" data-settings-collection="${key}">
+    <header><div><strong>${title}</strong><small>${description}</small></div><div><span>${settingsDraft[key].length}개</span><button class="secondary-button" type="button" data-settings-add="${key}">+ 항목 추가</button></div></header>
+    <div class="settings-collection-list">${settingsDraft[key].map((value, index) => `<div class="settings-collection-row" data-settings-index="${index}">
+      <i>${index + 1}</i><input type="text" value="${escapeHtml(value)}" aria-label="${escapeHtml(title)} ${index + 1}" />
+      <div class="settings-row-actions">${reorder ? `<button type="button" data-settings-move="up" aria-label="위로 이동" ${index === 0 ? "disabled" : ""}>↑</button><button type="button" data-settings-move="down" aria-label="아래로 이동" ${index === settingsDraft[key].length - 1 ? "disabled" : ""}>↓</button>` : ""}<button type="button" data-settings-remove aria-label="항목 삭제">×</button></div>
+    </div>`).join("")}</div>
+  </section>`;
+  return `<div class="settings-form-panel">
+    <div class="settings-panel-guide"><strong>새 Google 설문에 적용되는 선택지입니다.</strong><span>학교는 저장 시 가나다순으로 정리됩니다. 기존 응답 파일의 학교나 수강반은 이 목록과 관계없이 그대로 읽습니다.</span></div>
+    ${editor("schools", "학교 목록", "학교명을 개별 항목으로 관리합니다.")}
+    <div class="settings-list-grid">
+      ${editor("classLevels", "수강반 목록", "입력한 순서대로 설문에 표시합니다.", true)}
+      ${editor("classTimes", "시간대 목록", "수강반과 독립적으로 선택합니다.", true)}
+    </div>
+  </div>`;
 }
 
-function closeAchievementSettings() {
-  achievementSettingsDialog.close();
+function renderCommonSettings() {
+  commonSettingsBody.innerHTML = `<nav class="settings-tabs" aria-label="공통 설정 종류">
+    <button type="button" data-settings-tab="form" class="${settingsTab === "form" ? "active" : ""}">설문 설정</button>
+    <button type="button" data-settings-tab="report" class="${settingsTab === "report" ? "active" : ""}">성적표 설정</button>
+  </nav>
+  <section class="settings-tab-content">${settingsTab === "form" ? settingsListEditorHtml() : achievementEditorHtml(settingsDraft.achievement)}</section>`;
+  $$('[data-settings-tab]', commonSettingsBody).forEach((button) => button.addEventListener("click", () => {
+    captureSettingsDraft();
+    settingsTab = button.dataset.settingsTab;
+    renderCommonSettings();
+  }));
+  bindSettingsCollectionEvents();
 }
 
-function applyAchievementSettings(persist) {
-  achievementSettingsDraft = readAchievementEditor(achievementSettingsDialog, achievementSettingsDraft);
-  achievementTemplate = achievementSettingsDraft;
-  if (persist) {
-    showToast(storeAchievementTemplate(achievementTemplate) ? "성취도 문구를 저장하고 적용했습니다." : "저장소를 사용할 수 없어 이번 작업에만 적용했습니다.");
-  } else {
-    showToast("성취도 문구를 이번 작업에 적용했습니다.");
+function captureSettingsDraft() {
+  if (settingsTab === "report") {
+    settingsDraft.achievement = readAchievementEditor(commonSettingsBody, settingsDraft.achievement);
+    return;
   }
-  closeAchievementSettings();
+  $$('[data-settings-collection]', commonSettingsBody).forEach((collection) => {
+    settingsDraft[collection.dataset.settingsCollection] = $$(".settings-collection-row input", collection).map((input) => input.value.trim());
+  });
 }
 
-openAchievementSettingsButton.addEventListener("click", openAchievementSettings);
-$("#close-achievement-settings").addEventListener("click", closeAchievementSettings);
-$("#cancel-achievement-settings").addEventListener("click", closeAchievementSettings);
-$("#reset-achievement-settings").addEventListener("click", () => {
-  achievementSettingsDraft = createDefaultAchievementTemplate();
-  achievementSettingsBody.innerHTML = achievementEditorHtml(achievementSettingsDraft);
+function bindSettingsCollectionEvents() {
+  $$('[data-settings-add]', commonSettingsBody).forEach((button) => button.addEventListener("click", () => {
+    captureSettingsDraft();
+    const key = button.dataset.settingsAdd;
+    settingsDraft[key].push("");
+    renderCommonSettings();
+    const inputs = $$(`[data-settings-collection="${key}"] input`, commonSettingsBody);
+    inputs.at(-1)?.focus();
+  }));
+  $$('[data-settings-collection]', commonSettingsBody).forEach((collection) => {
+    collection.addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      const row = event.target.closest("[data-settings-index]");
+      if (!button || !row) return;
+      captureSettingsDraft();
+      const key = collection.dataset.settingsCollection;
+      const index = Number(row.dataset.settingsIndex);
+      if (button.hasAttribute("data-settings-remove")) settingsDraft[key].splice(index, 1);
+      if (button.dataset.settingsMove === "up" && index > 0) [settingsDraft[key][index - 1], settingsDraft[key][index]] = [settingsDraft[key][index], settingsDraft[key][index - 1]];
+      if (button.dataset.settingsMove === "down" && index < settingsDraft[key].length - 1) [settingsDraft[key][index + 1], settingsDraft[key][index]] = [settingsDraft[key][index], settingsDraft[key][index + 1]];
+      renderCommonSettings();
+    });
+  });
+}
+
+function showCommonSettingsPage(pushHistory = false) {
+  if (!appMain.hidden) mainScrollPosition = window.scrollY;
+  settingsDraft = cloneSettings(appSettings);
+  renderCommonSettings();
+  appMain.hidden = true;
+  commonSettingsPage.hidden = false;
+  document.body.classList.add("settings-view");
+  openCommonSettingsButton.setAttribute("aria-current", "page");
+  document.title = "공통 설정 | 모의고사 성적 분석";
+  if (pushHistory && window.location.hash !== "#settings") history.pushState({ view: "settings" }, "", "#settings");
+  window.scrollTo({ top: 0, behavior: "auto" });
+}
+
+function showMainPage() {
+  if (commonSettingsPage.hidden) return;
+  commonSettingsPage.hidden = true;
+  appMain.hidden = false;
+  document.body.classList.remove("settings-view");
+  openCommonSettingsButton.removeAttribute("aria-current");
+  document.title = "모의고사 성적 분석";
+  requestAnimationFrame(() => window.scrollTo({ top: mainScrollPosition, behavior: "auto" }));
+}
+
+function openCommonSettings() {
+  showCommonSettingsPage(true);
+}
+
+function closeCommonSettings() {
+  if (window.location.hash === "#settings" && history.state?.view === "settings") {
+    history.back();
+    return;
+  }
+  if (window.location.hash === "#settings") history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  showMainPage();
+}
+
+function syncPageFromLocation() {
+  if (window.location.hash === "#settings") showCommonSettingsPage(false);
+  else showMainPage();
+}
+
+function saveCommonSettings() {
+  captureSettingsDraft();
+  const labels = { schools: "학교", classLevels: "수강반", classTimes: "시간대" };
+  for (const key of Object.keys(labels)) {
+    if (settingsDraft[key].some((value) => !value)) {
+      settingsTab = "form";
+      renderCommonSettings();
+      showToast(`${labels[key]} 목록의 빈 항목을 입력하거나 삭제해주세요.`);
+      return;
+    }
+    if (new Set(settingsDraft[key]).size !== settingsDraft[key].length) {
+      settingsTab = "form";
+      renderCommonSettings();
+      showToast(`${labels[key]} 목록에 중복된 항목이 있습니다.`);
+      return;
+    }
+  }
+  if (!settingsDraft.schools.length || !settingsDraft.classLevels.length || !settingsDraft.classTimes.length) {
+    settingsTab = "form";
+    renderCommonSettings();
+    showToast("학교, 수강반, 시간대를 하나 이상 입력해주세요.");
+    return;
+  }
+  appSettings = normalizeSettings(settingsDraft);
+  achievementTemplate = appSettings.achievement;
+  showToast(saveSettings(appSettings) ? "공통 설정을 저장하고 적용했습니다." : "저장소를 사용할 수 없어 이번 작업에만 적용했습니다.");
+  closeCommonSettings();
+}
+
+openCommonSettingsButton.addEventListener("click", openCommonSettings);
+$("#back-common-settings").addEventListener("click", closeCommonSettings);
+$("#cancel-common-settings").addEventListener("click", closeCommonSettings);
+$("#reset-common-settings").addEventListener("click", () => {
+  captureSettingsDraft();
+  const defaults = createDefaultSettings();
+  if (settingsTab === "form") {
+    settingsDraft.schools = defaults.schools;
+    settingsDraft.classLevels = defaults.classLevels;
+    settingsDraft.classTimes = defaults.classTimes;
+  } else {
+    settingsDraft.achievement = defaults.achievement;
+  }
+  renderCommonSettings();
 });
-$("#apply-achievement-settings").addEventListener("click", () => applyAchievementSettings(false));
-$("#save-achievement-settings").addEventListener("click", () => applyAchievementSettings(true));
+$("#save-common-settings").addEventListener("click", saveCommonSettings);
+window.addEventListener("popstate", syncPageFromLocation);
+window.addEventListener("hashchange", syncPageFromLocation);
+syncPageFromLocation();
 
 startButton.addEventListener("click", async () => {
   if (currentMode === "report") await startReportWorkflow();
@@ -721,7 +853,7 @@ async function createFormFromDraft() {
   try {
     const token = await requestGoogleAccessToken(configuredGoogleClientId());
     renderFormCreating();
-    createdGoogleForm = await createGoogleQuiz(formDraft, token, fetch, updateFormCreatingProgress);
+    createdGoogleForm = await createGoogleQuiz(formDraft, token, fetch, updateFormCreatingProgress, appSettings);
     updateFormCreatingProgress(6, "시험 설정 Excel을 만들고 있습니다.");
     await downloadExamConfigWorkbook(formDraft, createdGoogleForm);
     renderFormSuccess();

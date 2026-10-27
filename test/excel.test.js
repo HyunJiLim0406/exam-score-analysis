@@ -9,6 +9,7 @@ import { achievementEditorHtml, loadAchievementTemplate, storeAchievementTemplat
 import { buildClassFolderArchive, buildReportAnalyses, buildStudentReportHtml } from "../src/individual-report.js";
 import { buildExamConfigWorkbook, readExamConfigFile, validateExamConfig } from "../src/exam-config.js";
 import { buildGoogleFormRequests, createGoogleQuiz } from "../src/google-forms.js";
+import { loadSettings, saveSettings, SETTINGS_STORAGE_KEY } from "../src/settings-store.js";
 
 async function localResponseFiles() {
   const names = await readdir(new URL("..", import.meta.url));
@@ -97,6 +98,29 @@ test("Google Forms 퀴즈 요청에 학생 정보와 개인정보 선택 및 채
   assert.deepEqual(requests[6].createItem.item.questionItem.question.choiceQuestion.options.map((item) => item.value), ["동의", "미동의"]);
   assert.equal(requests[7].createItem.item.questionItem.question.grading.pointValue, 2);
   assert.equal(requests.at(-1).createItem.item.questionItem.question.grading.pointValue, 3);
+
+  const customized = buildGoogleFormRequests(exampleExamConfig(), { schools: ["테스트고"], classLevels: ["특강"], classTimes: ["월 오후 7:00"] });
+  assert.deepEqual(customized[2].createItem.item.questionItem.question.choiceQuestion.options.map((item) => item.value), ["테스트고"]);
+  assert.deepEqual(customized[4].createItem.item.questionItem.question.choiceQuestion.options.map((item) => item.value), ["특강"]);
+  assert.deepEqual(customized[5].createItem.item.questionItem.question.choiceQuestion.options.map((item) => item.value), ["월 오후 7:00"]);
+});
+
+test("기존 평가 문구를 공통 설정으로 이전하고 목록을 정규화해 저장한다", () => {
+  const values = new Map();
+  const storage = { getItem: (key) => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };
+  const legacy = createDefaultAchievementTemplate();
+  legacy.areas["화작"].상 = "이전 저장 문구";
+  values.set("mock-exam-score-analysis:achievement-template:v1", JSON.stringify(legacy));
+
+  const migrated = loadSettings(storage);
+  assert.equal(migrated.achievement.areas["화작"].상, "이전 저장 문구");
+  migrated.schools = [" 잠실고 ", "가락고", "잠실고", ""];
+  migrated.classLevels = ["상위", "상위", "최상위"];
+  assert.equal(saveSettings(migrated, storage), true);
+
+  const stored = JSON.parse(values.get(SETTINGS_STORAGE_KEY));
+  assert.deepEqual(stored.schools, ["가락고", "잠실고"]);
+  assert.deepEqual(stored.classLevels, ["상위", "최상위"]);
 });
 
 test("Google Form을 생성하고 게시한 뒤 링크 공개 권한을 부여한다", async () => {

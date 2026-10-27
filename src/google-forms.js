@@ -9,15 +9,18 @@ let identityPromise = null;
 const textQuestion = (title, index) => ({ createItem: { item: { title, questionItem: { question: { required: true, textQuestion: { paragraph: false } } } }, location: { index } } });
 const choiceQuestion = (title, options, index, type = "DROP_DOWN", description = "") => ({ createItem: { item: { title, description, questionItem: { question: { required: true, choiceQuestion: { type, options: options.map((value) => ({ value })) } } } }, location: { index } } });
 
-export function buildGoogleFormRequests(config) {
+export function buildGoogleFormRequests(config, formOptions = {}) {
   const validation = validateExamConfig(config);
   if (!validation.valid) throw new Error(validation.errors[0]);
+  const schools = formOptions.schools?.length ? formOptions.schools : SCHOOL_OPTIONS;
+  const classLevels = formOptions.classLevels?.length ? formOptions.classLevels : CLASS_LEVEL_OPTIONS;
+  const classTimes = formOptions.classTimes?.length ? formOptions.classTimes : CLASS_TIME_OPTIONS;
   const requests = [{ updateSettings: { settings: { quizSettings: { isQuiz: true }, emailCollectionType: "DO_NOT_COLLECT" }, updateMask: "quizSettings.isQuiz,emailCollectionType" } }];
   requests.push(textQuestion("이름", 0));
-  requests.push(choiceQuestion("학교(OO고)", SCHOOL_OPTIONS, 1));
+  requests.push(choiceQuestion("학교(OO고)", schools, 1));
   requests.push(textQuestion("본인 전화번호(-없이, 공백 없이 숫자만 11자리)", 2));
-  requests.push(choiceQuestion("수강반", CLASS_LEVEL_OPTIONS, 3));
-  requests.push(choiceQuestion("시간대", CLASS_TIME_OPTIONS, 4));
+  requests.push(choiceQuestion("수강반", classLevels, 3));
+  requests.push(choiceQuestion("시간대", classTimes, 4));
   requests.push(choiceQuestion(PRIVACY_CONSENT_TITLE, ["동의", "미동의"], 5, "RADIO", PRIVACY_CONSENT_DESCRIPTION));
   config.questions.forEach((question, questionIndex) => requests.push({ createItem: { item: { title: `${questionIndex + 1}번`, questionItem: { question: { required: true, grading: { pointValue: Number(question.points), correctAnswers: { answers: [{ value: String(question.answer) }] } }, choiceQuestion: { type: "RADIO", options: [1, 2, 3, 4, 5].map((value) => ({ value: String(value) })) } } } }, location: { index: questionIndex + 6 } } }));
   return requests;
@@ -54,14 +57,14 @@ async function googleFetch(url, token, options = {}, fetchImpl = fetch) {
   return body;
 }
 
-export async function createGoogleQuiz(config, accessToken, fetchImpl = fetch, onProgress = () => {}) {
+export async function createGoogleQuiz(config, accessToken, fetchImpl = fetch, onProgress = () => {}, formOptions = {}) {
   onProgress(0, "Google Drive에 설문 파일을 만들고 있습니다.");
   const created = await googleFetch(`${FORMS_API}?unpublished=true`, accessToken, { method: "POST", body: JSON.stringify({ info: { title: config.title.trim(), documentTitle: config.title.trim() } }) }, fetchImpl);
   const formId = created.formId;
   const editUri = `https://docs.google.com/forms/d/${formId}/edit`;
   try {
     onProgress(1, "퀴즈와 자동 채점 설정을 적용하고 있습니다.");
-    const [settingsRequest, ...itemRequests] = buildGoogleFormRequests(config);
+    const [settingsRequest, ...itemRequests] = buildGoogleFormRequests(config, formOptions);
     await googleFetch(`${FORMS_API}/${formId}:batchUpdate`, accessToken, { method: "POST", body: JSON.stringify({ requests: [settingsRequest] }) }, fetchImpl);
     onProgress(2, `${config.questions.length}개 문항과 학생 정보 항목을 추가하고 있습니다.`);
     for (let index = 0; index < itemRequests.length; index += 80) {
