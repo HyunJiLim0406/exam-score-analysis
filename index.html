@@ -90,6 +90,12 @@
             </span>
             <span><strong>주차별 비교</strong></span>
           </button>
+          <button class="mode-button" type="button" data-mode="form" role="tab" aria-selected="false">
+            <span class="mode-icon green">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v18H7z" /><path d="M10 7h4M10 11h4M10 15h2" /></svg>
+            </span>
+            <span><strong>구글 설문 만들기</strong></span>
+          </button>
         </div>
 
         <div class="workspace">
@@ -149,6 +155,13 @@
                 </label>
                 <button class="remove-file" type="button" data-clear-input="after-file" aria-label="현재 주차 파일 삭제" hidden>×</button>
               </div>
+            </div>
+
+            <div id="form-intro" class="form-intro" hidden>
+              <span class="form-intro-icon">G</span>
+              <strong>정답과 배점으로 퀴즈를 만들어요</strong>
+              <p>개인 Google 계정에 링크 공개 설문을 만들고, 같은 설정을 Excel로 내려받습니다.</p>
+              <ul><li>학교·수강반·시간대 드롭다운</li><li>개인정보 동의·미동의 선택</li><li>객관식 1~5 자동 채점</li></ul>
             </div>
 
             <button class="primary-button" id="start-button" type="button" disabled>
@@ -226,6 +239,14 @@
                 </table>
                 <p id="empty-state" class="empty-state" hidden>조건에 맞는 학생이 없어요.</p>
               </div>
+            </div>
+
+            <div id="form-preview" class="form-preview" hidden>
+              <div class="form-preview-title"><span>Google Forms</span><h4>모의고사 답안 제출</h4><p>공개 링크로 누구나 응답할 수 있습니다.</p></div>
+              <div class="form-preview-field"><small>이름 *</small><i></i></div>
+              <div class="form-preview-field"><small>학교(OO고) *</small><b>학교 선택</b></div>
+              <div class="form-preview-row"><div class="form-preview-field"><small>수강반 *</small><b>반 선택</b></div><div class="form-preview-field"><small>시간대 *</small><b>시간 선택</b></div></div>
+              <div class="form-preview-question"><small>1번 · 2점</small><div><i>1</i><i>2</i><i>3</i><i>4</i><i>5</i></div></div>
             </div>
           </section>
         </div>

@@ -17,6 +17,8 @@ import {
   readAchievementEditor,
   storeAchievementTemplate,
 } from "./src/achievement-template-ui.js";
+import { downloadExamConfigWorkbook, readExamConfigFile, validateExamConfig } from "./src/exam-config.js";
+import { configuredGoogleClientId, createGoogleQuiz, requestGoogleAccessToken } from "./src/google-forms.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -24,8 +26,10 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const modeButtons = $$(".mode-button");
 const reportUpload = $("#report-upload");
 const compareUpload = $("#compare-upload");
+const formIntro = $("#form-intro");
 const reportPreview = $("#report-preview");
 const comparePreview = $("#compare-preview");
+const formPreview = $("#form-preview");
 const reportFile = $("#report-file");
 const beforeFile = $("#before-file");
 const afterFile = $("#after-file");
@@ -59,6 +63,8 @@ let currentMode = "report";
 let currentDataset = null;
 let currentComparison = null;
 let currentConfig = [];
+let formDraft = createFormDraft();
+let createdGoogleForm = null;
 let achievementTemplate = loadAchievementTemplate();
 let achievementSettingsDraft = achievementTemplate;
 let comparisonPage = 1;
@@ -77,6 +83,13 @@ const subjectOptions = [
 const areaOptions = ["화작", "언어", "매체", "인문·예술", "사회", "과학·기술", "고전 소설", "고전 시가", "현대 소설", "현대 시", "수필"];
 const themeStorageKey = "score-analysis-theme";
 const colorScheme = window.matchMedia("(prefers-color-scheme: dark)");
+
+function createFormDraft(questionCount = 45) {
+  return {
+    title: "",
+    questions: Array.from({ length: questionCount }, () => ({ answer: "", points: 2, subject: "", area: "" })),
+  };
+}
 
 function applyTheme(theme, persist = false) {
   document.documentElement.dataset.theme = theme;
@@ -128,22 +141,23 @@ function setMode(mode) {
   });
 
   const isReport = mode === "report";
+  const isCompare = mode === "compare";
   reportUpload.hidden = !isReport;
-  compareUpload.hidden = isReport;
+  compareUpload.hidden = !isCompare;
+  formIntro.hidden = mode !== "form";
   reportPreview.hidden = !isReport;
-  comparePreview.hidden = isReport;
-  panelKicker.textContent = isReport ? "이번 주 응답 파일" : "비교할 두 주차 파일";
-  panelTitle.textContent = isReport ? "성적표를 만들 파일을 올려주세요" : "이전·현재 주차 파일을 올려주세요";
-  previewLabel.textContent = isReport ? "완성 예시" : "전체 학생 변화";
-  previewTitle.textContent = isReport ? "개인 성적표" : "주차별 성적 비교";
-  startLabel.textContent = isReport ? "파일 확인하기" : "두 파일 비교하기";
+  comparePreview.hidden = !isCompare;
+  formPreview.hidden = mode !== "form";
+  panelKicker.textContent = isReport ? "이번 주 응답 파일" : isCompare ? "비교할 두 주차 파일" : "새 답안 제출 설문";
+  panelTitle.textContent = isReport ? "성적표를 만들 파일을 올려주세요" : isCompare ? "이전·현재 주차 파일을 올려주세요" : "Google Forms 퀴즈를 만드세요";
+  previewLabel.textContent = isReport ? "완성 예시" : isCompare ? "전체 학생 변화" : "생성 예시";
+  previewTitle.textContent = isReport ? "개인 성적표" : isCompare ? "주차별 성적 비교" : "답안 제출 설문";
+  startLabel.textContent = isReport ? "파일 확인하기" : isCompare ? "두 파일 비교하기" : "설문 설정하기";
   updateButtonState();
 }
 
 function updateButtonState() {
-  startButton.disabled = currentMode === "report"
-    ? !selectedFiles.report
-    : !selectedFiles.before || !selectedFiles.after;
+  startButton.disabled = currentMode === "report" ? !selectedFiles.report : currentMode === "compare" ? !selectedFiles.before || !selectedFiles.after : false;
 }
 
 function bindFileInput(input, onFile) {
@@ -279,7 +293,7 @@ function restartWorkflow() {
     selectedFiles.report = null;
     renderUploadFile(reportFile, null);
     resetReportResult();
-  } else {
+  } else if (currentMode === "compare") {
     beforeFile.value = "";
     afterFile.value = "";
     selectedFiles.before = null;
@@ -287,6 +301,9 @@ function restartWorkflow() {
     renderComparisonFile(beforeFile, null);
     renderComparisonFile(afterFile, null);
     resetComparisonResult();
+  } else {
+    createdGoogleForm = null;
+    resetWorkflowDisplay();
   }
   workspace.hidden = false;
   toolShell.classList.remove("workflow-active");
@@ -329,7 +346,8 @@ $("#save-achievement-settings").addEventListener("click", () => applyAchievement
 
 startButton.addEventListener("click", async () => {
   if (currentMode === "report") await startReportWorkflow();
-  else await startComparisonWorkflow();
+  else if (currentMode === "compare") await startComparisonWorkflow();
+  else startFormWorkflow();
 });
 
 async function startReportWorkflow() {
@@ -361,7 +379,10 @@ function renderReportWorkflow() {
     <section class="workflow-section">
       <div class="workflow-section-head">
         <div><h3>시험 설정</h3><p>정답과 배점을 입력하면 개인별 상세 성적표를 만들 수 있습니다.</p></div>
-        ${currentDataset.questionCount === 45 ? '<button class="secondary-button" id="load-week1-config" type="button">1주차 예시 설정 불러오기</button>' : ""}
+        <div class="template-actions">
+          <label class="secondary-button file-button" for="exam-config-file">시험 설정 불러오기<input id="exam-config-file" type="file" accept=".xlsx" /></label>
+          ${currentDataset.questionCount === 45 ? '<button class="secondary-button" id="load-week1-config" type="button">1주차 예시 설정</button>' : ""}
+        </div>
       </div>
       <div class="bulk-config">
         <div class="bulk-config-title"><strong>문항 범위 일괄 설정</strong><small>비워둔 항목은 기존 값을 유지합니다.</small></div>
@@ -441,6 +462,21 @@ function readConfigTable() {
 }
 
 function bindReportWorkflowEvents() {
+  $("#exam-config-file", workflowBody).addEventListener("change", async (event) => {
+    const input = event.currentTarget;
+    try {
+      const imported = await readExamConfigFile(input.files[0]);
+      if (imported.questions.length !== currentDataset.questionCount) throw new Error(`응답은 ${currentDataset.questionCount}문항인데 설정 파일은 ${imported.questions.length}문항입니다.`);
+      currentConfig = imported.questions.map(({ answer, points, subject, area }) => ({ answer, points, subject, area }));
+      $(".config-table tbody", workflowBody).innerHTML = configRowsHtml();
+      validateCurrentConfig();
+      showToast(`${imported.title || "시험"} 설정을 불러왔습니다.`);
+    } catch (error) {
+      showToast(error.message || "시험 설정을 불러오지 못했습니다.");
+    } finally {
+      input.value = "";
+    }
+  });
   $("#load-week1-config", workflowBody)?.addEventListener("click", () => {
     currentConfig = buildWeekOneExampleConfig();
     $(".config-table tbody", workflowBody).innerHTML = configRowsHtml();
@@ -572,6 +608,188 @@ function validateCurrentConfig() {
   message.textContent = `${detail.results.length}명의 점수가 모두 일치합니다. 상세 성적표를 만들 수 있습니다.`;
   download.disabled = false;
   pdfDownload.disabled = false;
+}
+
+function startFormWorkflow() {
+  openWorkflow("구글 설문 만들기", "시험 설정");
+  renderFormWorkflow();
+}
+
+function formQuestionRowsHtml() {
+  return formDraft.questions.map((question, index) => `<tr data-question="${index}">
+    <td>${index + 1}</td>
+    <td><select class="form-answer"><option value="" disabled hidden ${question.answer ? "" : "selected"}>—</option>${[1, 2, 3, 4, 5].map((choice) => `<option value="${choice}" ${String(question.answer) === String(choice) ? "selected" : ""}>${choice}</option>`).join("")}</select></td>
+    <td><input class="form-points" type="number" min="0" max="100" step="1" value="${escapeHtml(question.points)}" /></td>
+  </tr>`).join("");
+}
+
+function renderFormWorkflow() {
+  workflowKicker.textContent = "구글 설문 만들기";
+  workflowTitle.textContent = formDraft.title || "새 답안 제출 설문";
+  const clientConfigured = Boolean(configuredGoogleClientId());
+  workflowBody.innerHTML = `
+    <div class="workflow-summary form-summary">
+      <div><span>공개 범위</span><strong>링크 공개</strong><small>Google 로그인 없이 응답</small></div>
+      <div><span>학생 정보</span><strong>5개</strong><small>이름·학교·전화번호·반·시간대</small></div>
+      <div><span>개인정보</span><strong>의사 표시</strong><small>동의 또는 미동의 필수 선택</small></div>
+      <div><span>설정 파일</span><strong>Excel</strong><small>설문 생성과 함께 다운로드</small></div>
+    </div>
+    ${clientConfigured ? "" : '<div class="validation-message warn oauth-warning">Google OAuth 클라이언트 ID가 아직 설정되지 않았습니다. 화면 작성과 Excel 검증은 가능하지만 실제 설문 생성 전 <code>VITE_GOOGLE_CLIENT_ID</code> 설정이 필요합니다.</div>'}
+    <section class="workflow-section">
+      <div class="workflow-section-head"><div><h3>기본 정보</h3><p>개인 Google Drive에 생성될 퀴즈의 이름과 문항 수입니다.</p></div></div>
+      <div class="form-basics">
+        <label>시험명<input id="form-title" type="text" value="${escapeHtml(formDraft.title)}" placeholder="예: 2026 모의고사 클리닉 3주차" /></label>
+        <label>문항 수<input id="form-question-count" type="number" min="1" max="100" value="${formDraft.questions.length}" /></label>
+      </div>
+    </section>
+    <section class="workflow-section">
+      <div class="workflow-section-head"><div><h3>정답과 배점</h3><p>모든 문항은 선택지 1~5의 필수 객관식으로 생성됩니다.</p></div></div>
+      <div class="bulk-config form-bulk-config">
+        <div class="bulk-config-title"><strong>문항 범위 일괄 설정</strong><small>비워둔 항목은 기존 값을 유지합니다.</small></div>
+        <label>시작 문항<input id="form-bulk-from" type="number" min="1" max="${formDraft.questions.length}" value="1" /></label>
+        <label>끝 문항<input id="form-bulk-to" type="number" min="1" max="${formDraft.questions.length}" value="${formDraft.questions.length}" /></label>
+        <label>정답<select id="form-bulk-answer"><option value="">변경 안 함</option>${[1, 2, 3, 4, 5].map((value) => `<option value="${value}">${value}</option>`).join("")}</select></label>
+        <label>배점<input id="form-bulk-points" type="number" min="0" max="100" placeholder="변경 안 함" /></label>
+        <button class="secondary-button" id="apply-form-bulk" type="button">범위에 적용</button>
+      </div>
+      <div class="config-table-wrap form-config-table-wrap"><table class="config-table form-config-table"><thead><tr><th>문항</th><th>정답</th><th>배점</th></tr></thead><tbody>${formQuestionRowsHtml()}</tbody></table></div>
+      <div id="form-validation" class="validation-message warn"></div>
+    </section>
+    <section class="form-create-action">
+      <div><strong>Google Forms 퀴즈와 시험 설정 Excel 만들기</strong><small>Google 권한 승인 후 공개 설문을 만들고 설정 파일을 자동으로 내려받습니다.</small></div>
+      <button class="workflow-action" id="create-google-form" type="button" data-busy="Google 설문 만드는 중">Google 계정으로 만들기</button>
+    </section>`;
+  bindFormWorkflowEvents();
+  validateFormDraft();
+}
+
+function readFormDraftTable() {
+  formDraft.title = $("#form-title", workflowBody).value.trim();
+  formDraft.questions = $$(".form-config-table tbody tr", workflowBody).map((row) => ({
+    answer: $(".form-answer", row).value,
+    points: Number($(".form-points", row).value),
+    subject: "",
+    area: "",
+  }));
+  return formDraft;
+}
+
+function validateFormDraft() {
+  readFormDraftTable();
+  const result = validateExamConfig(formDraft);
+  const message = $("#form-validation", workflowBody);
+  const button = $("#create-google-form", workflowBody);
+  message.className = `validation-message ${result.valid ? "ok" : "warn"}`;
+  message.textContent = result.valid ? `${formDraft.questions.length}문항 · 총 ${result.totalPoints}점 · 설문을 만들 수 있습니다.` : result.errors[0];
+  button.disabled = !result.valid;
+}
+
+function bindFormWorkflowEvents() {
+  $("#form-title", workflowBody).addEventListener("input", validateFormDraft);
+  $(".form-config-table", workflowBody).addEventListener("change", validateFormDraft);
+  $("#form-question-count", workflowBody).addEventListener("change", (event) => {
+    readFormDraftTable();
+    const count = Math.max(1, Math.min(100, Number(event.currentTarget.value) || 45));
+    formDraft.questions = Array.from({ length: count }, (_, index) => formDraft.questions[index] || { answer: "", points: 2, subject: "", area: "" });
+    renderFormWorkflow();
+  });
+  $("#apply-form-bulk", workflowBody).addEventListener("click", () => {
+    readFormDraftTable();
+    const from = Number($("#form-bulk-from", workflowBody).value);
+    const to = Number($("#form-bulk-to", workflowBody).value);
+    const answer = $("#form-bulk-answer", workflowBody).value;
+    const pointsInput = $("#form-bulk-points", workflowBody).value;
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > formDraft.questions.length || from > to) return showToast("적용할 문항 범위를 확인해주세요.");
+    if (!answer && pointsInput === "") return showToast("정답이나 배점을 하나 이상 입력해주세요.");
+    for (let index = from - 1; index < to; index += 1) {
+      if (answer) formDraft.questions[index].answer = answer;
+      if (pointsInput !== "") formDraft.questions[index].points = Number(pointsInput);
+    }
+    renderFormWorkflow();
+    showToast(`${from}번부터 ${to}번 문항에 적용했습니다.`);
+  });
+  $("#create-google-form", workflowBody).addEventListener("click", createFormFromDraft);
+}
+
+async function createFormFromDraft() {
+  readFormDraftTable();
+  const button = $("#create-google-form", workflowBody);
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = button.dataset.busy;
+  button.classList.add("is-busy");
+  try {
+    const token = await requestGoogleAccessToken(configuredGoogleClientId());
+    renderFormCreating();
+    createdGoogleForm = await createGoogleQuiz(formDraft, token, fetch, updateFormCreatingProgress);
+    updateFormCreatingProgress(6, "시험 설정 Excel을 만들고 있습니다.");
+    await downloadExamConfigWorkbook(formDraft, createdGoogleForm);
+    renderFormSuccess();
+  } catch (error) {
+    showToast(error.message || "Google 설문을 만들지 못했습니다.");
+    console.error(error);
+    if (button.isConnected) {
+      button.disabled = false;
+      button.textContent = original;
+      button.classList.remove("is-busy");
+    } else {
+      renderFormFailure(error);
+    }
+  }
+}
+
+const formCreationSteps = ["설문 파일", "퀴즈 설정", "문항 구성", "설문 게시", "링크 공개", "링크 확인", "Excel 생성"];
+
+function renderFormCreating() {
+  workflowKicker.textContent = "구글 설문 생성 중";
+  workflowTitle.textContent = formDraft.title;
+  workflowBody.innerHTML = `<div class="form-creating" aria-live="polite">
+    <span class="form-creating-spinner" aria-hidden="true"></span>
+    <h3>Google 설문을 만들고 있습니다</h3>
+    <p id="form-creating-message">Google Drive에 설문 파일을 만들고 있습니다.</p>
+    <div class="form-creating-steps">${formCreationSteps.map((label, index) => `<div data-creating-step="${index}"><i>${index + 1}</i><span>${label}</span></div>`).join("")}</div>
+    <small>창을 닫거나 새로고침하지 말고 잠시 기다려주세요.</small>
+  </div>`;
+  updateFormCreatingProgress(0, "Google Drive에 설문 파일을 만들고 있습니다.");
+}
+
+function updateFormCreatingProgress(step, message) {
+  const messageElement = $("#form-creating-message", workflowBody);
+  if (!messageElement) return;
+  messageElement.textContent = message;
+  $$('[data-creating-step]', workflowBody).forEach((element, index) => {
+    element.classList.toggle("done", index < step);
+    element.classList.toggle("active", index === step);
+  });
+}
+
+function renderFormFailure(error) {
+  workflowKicker.textContent = "구글 설문 생성 실패";
+  workflowTitle.textContent = formDraft.title || "새 답안 제출 설문";
+  workflowBody.innerHTML = `<div class="form-failure">
+    <span>!</span><h3>설문 생성을 마치지 못했습니다</h3>
+    <p>${escapeHtml(error.message || "Google API 요청 중 오류가 발생했습니다.")}</p>
+    ${error.editUri ? `<a class="secondary-button" href="${escapeHtml(error.editUri)}" target="_blank" rel="noopener">생성된 설문 확인</a>` : ""}
+    <button class="workflow-action" id="retry-google-form" type="button">설정으로 돌아가 다시 시도</button>
+  </div>`;
+  $("#retry-google-form", workflowBody).addEventListener("click", renderFormWorkflow);
+}
+
+function renderFormSuccess() {
+  workflowKicker.textContent = "구글 설문 생성 완료";
+  workflowTitle.textContent = formDraft.title;
+  workflowBody.innerHTML = `<div class="form-success">
+    <span class="form-success-mark">✓</span>
+    <h3>응답 가능한 Google 설문을 만들었습니다</h3>
+    <p>${formDraft.questions.length}문항 · 100점 · 링크가 있는 누구나 응답할 수 있습니다.<br />시험 설정 Excel도 함께 다운로드했습니다.</p>
+    <div class="form-success-actions">
+      <a class="form-success-button response" href="${escapeHtml(createdGoogleForm.responderUri)}" target="_blank" rel="noopener"><strong>응답 설문 열기</strong><small>학생에게 공유할 화면</small></a>
+      <a class="form-success-button edit" href="${escapeHtml(createdGoogleForm.editUri)}" target="_blank" rel="noopener"><strong>설문 편집하기</strong><small>Google Forms에서 확인</small></a>
+      <button class="form-success-button excel" id="redownload-exam-config" type="button"><strong>설정 Excel 받기</strong><small>정답·배점 파일 다시 받기</small></button>
+    </div>
+    <small class="form-success-id">Form ID · ${escapeHtml(createdGoogleForm.formId)}</small>
+  </div>`;
+  $("#redownload-exam-config", workflowBody).addEventListener("click", () => downloadExamConfigWorkbook(formDraft, createdGoogleForm));
 }
 
 async function startComparisonWorkflow() {

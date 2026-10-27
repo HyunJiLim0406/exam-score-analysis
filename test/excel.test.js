@@ -7,6 +7,8 @@ import { acceptCandidate, buildWeekOneExampleConfig, calculateDetailedResults, c
 import { achievementLevel, createDefaultAchievementTemplate, overallMessage } from "../src/achievement-template.js";
 import { achievementEditorHtml, loadAchievementTemplate, storeAchievementTemplate } from "../src/achievement-template-ui.js";
 import { buildClassFolderArchive, buildReportAnalyses, buildStudentReportHtml } from "../src/individual-report.js";
+import { buildExamConfigWorkbook, readExamConfigFile, validateExamConfig } from "../src/exam-config.js";
+import { buildGoogleFormRequests, createGoogleQuiz } from "../src/google-forms.js";
 
 async function localResponseFiles() {
   const names = await readdir(new URL("..", import.meta.url));
@@ -54,6 +56,66 @@ test("Google Sheets UTF-8 CSV의 쉼표와 여러 줄 필드를 읽는다", asyn
   assert.equal(dataset.submissions[0].className, "상위, 주말반");
   assert.equal(dataset.submissions[0].consent, "첫째 줄\n둘째 줄");
   assert.deepEqual(dataset.submissions[0].answers, ["1", "2"]);
+});
+
+test("분리된 수강반과 시간대를 기존 수강반 형식으로 합친다", async () => {
+  const csv = [
+    "타임스탬프,점수,이름,학교(OO고),본인 전화번호,수강반,시간대,개인정보 수집·이용 동의,1번",
+    "2026-10-27,100,김학생,한맥고,01012345678,최상위,토 오후 2:30,미동의,1",
+  ].join("\n");
+  const dataset = await readResponseFile(nodeFile("분리 수강반.csv", Buffer.from(csv)));
+
+  assert.equal(dataset.submissions[0].className, "최상위 토 오후 2:30");
+  assert.equal(dataset.submissions[0].consent, "미동의");
+});
+
+function exampleExamConfig() {
+  return {
+    title: "2026 모의고사 3주차",
+    questions: Array.from({ length: 45 }, (_, index) => ({ answer: String(index % 5 + 1), points: index < 35 ? 2 : 3, subject: index < 5 ? "화작" : "", area: index < 5 ? "화작" : "" })),
+  };
+}
+
+test("시험 설정 Excel을 저장하고 다시 읽는다", async () => {
+  const config = exampleExamConfig();
+  assert.deepEqual(validateExamConfig(config), { valid: true, errors: [], totalPoints: 100 });
+  const bytes = Buffer.from(await buildExamConfigWorkbook(config, { formId: "form-123", responderUri: "https://example.com/respond" }));
+  const restored = await readExamConfigFile(nodeFile("시험설정.xlsx", bytes));
+
+  assert.equal(restored.title, config.title);
+  assert.equal(restored.questions.length, 45);
+  assert.deepEqual(restored.questions[0], { number: 1, answer: "1", points: 2, subject: "화작", area: "화작" });
+  assert.equal(restored.questions[44].points, 3);
+});
+
+test("Google Forms 퀴즈 요청에 학생 정보와 개인정보 선택 및 채점 설정을 넣는다", () => {
+  const requests = buildGoogleFormRequests(exampleExamConfig());
+  assert.equal(requests.length, 52);
+  assert.equal(requests[0].updateSettings.settings.emailCollectionType, "DO_NOT_COLLECT");
+  assert.equal(requests[4].createItem.item.title, "수강반");
+  assert.equal(requests[5].createItem.item.title, "시간대");
+  assert.deepEqual(requests[6].createItem.item.questionItem.question.choiceQuestion.options.map((item) => item.value), ["동의", "미동의"]);
+  assert.equal(requests[7].createItem.item.questionItem.question.grading.pointValue, 2);
+  assert.equal(requests.at(-1).createItem.item.questionItem.question.grading.pointValue, 3);
+});
+
+test("Google Form을 생성하고 게시한 뒤 링크 공개 권한을 부여한다", async () => {
+  const calls = [];
+  const responses = [{ formId: "form-123" }, {}, {}, {}, {}, { responderUri: "https://docs.google.com/forms/d/form-123/viewform" }];
+  const fetchMock = async (url, options = {}) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify(responses[calls.length - 1]), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const result = await createGoogleQuiz(exampleExamConfig(), "token", fetchMock);
+
+  assert.equal(result.formId, "form-123");
+  assert.equal(calls.length, 6);
+  assert.match(calls[0].url, /forms\?unpublished=true$/);
+  assert.match(calls[1].url, /:batchUpdate$/);
+  assert.match(calls[2].url, /:batchUpdate$/);
+  assert.match(calls[3].url, /:setPublishSettings$/);
+  assert.match(calls[4].url, /drive\/v3\/files\/form-123\/permissions$/);
+  assert.deepEqual(JSON.parse(calls[4].options.body), { type: "anyone", view: "published", role: "reader" });
 });
 
 test("제공된 응답 XLSX를 CSV로 변환해도 분석 데이터가 같다", async (context) => {

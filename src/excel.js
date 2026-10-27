@@ -149,6 +149,7 @@ export async function readResponseFile(file) {
     school: findColumn(headers, (key) => key.startsWith("학교")),
     phone: findColumn(headers, (key) => key.includes("전화번호")),
     className: findColumn(headers, (key) => key === "수강반"),
+    classTime: findColumn(headers, (key) => key === "시간대"),
     consent: findColumn(headers, (key) => key.includes("개인정보") && key.includes("동의")),
   };
 
@@ -182,7 +183,10 @@ export async function readResponseFile(file) {
       name,
       school,
       phone,
-      className: textOf(row.getCell(columns.className)),
+      className: [textOf(row.getCell(columns.className)), columns.classTime ? textOf(row.getCell(columns.classTime)) : ""]
+        .filter(Boolean)
+        .filter((value, index, values) => index === 0 || !values[0].includes(value))
+        .join(" "),
       consent: columns.consent ? textOf(row.getCell(columns.consent)) : "",
       answers,
       normalizedName: normalizeName(name),
