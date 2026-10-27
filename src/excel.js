@@ -445,7 +445,7 @@ function addTitle(sheet, title, subtitle, endColumn) {
 export async function exportReportWorkbook(dataset, config = null) {
   rankDataset(dataset);
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "모의고사 성적 분석";
+  workbook.creator = "모의고사 운영 도구";
   const used = new Set();
   const summary = workbook.addWorksheet(safeSheetName("성적 요약", used), { views: [{ state: "frozen", ySplit: 4 }] });
   addTitle(summary, "성적 요약", dataset.fileName, 7);
@@ -566,7 +566,7 @@ function buildStudentSheet(sheet, submission, result, participantCount) {
 
 export async function exportComparisonWorkbook(comparison, type = "rank") {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "모의고사 성적 분석";
+  workbook.creator = "모의고사 운영 도구";
   const used = new Set();
   const matches = [...comparison.matches].sort((a, b) => b.rankChange - a.rankChange || b.scoreChange - a.scoreChange || a.current.name.localeCompare(b.current.name, "ko"));
   const subtitle = `${comparison.previous.fileName} → ${comparison.current.fileName}`;

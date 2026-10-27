@@ -36,7 +36,7 @@ export async function buildExamConfigWorkbook(config, form = {}) {
   const validation = validateExamConfig(config);
   if (!validation.valid) throw new Error(validation.errors[0]);
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "모의고사 성적 분석";
+  workbook.creator = "모의고사 운영 도구";
   const sheet = workbook.addWorksheet("시험 설정", { views: [{ state: "frozen", ySplit: 9 }] });
   sheet.addRow(["시험 설정"]);
   sheet.mergeCells("A1:E1");

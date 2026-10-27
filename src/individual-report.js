@@ -81,7 +81,6 @@ export function buildReportAnalyses(dataset, config, template) {
       totalAverage,
       participantCount,
       percentile: participantCount ? Math.ceil((result.submission.rank / participantCount) * 100) : 0,
-      status: result.calculatedScore < 10 ? "재시험 대상" : "응시 완료",
       subjects: subjectResults,
       areas: areaResults,
       diagnostics: [
@@ -116,13 +115,12 @@ export function buildStudentReportHtml(analysis, examTitle) {
       <div class="pdf-main-score"><span>나의 점수</span><strong>${analysis.score}<small> / ${analysis.totalPoints}</small></strong></div>
       <div><span>전체 등수</span><strong>${student.rank}<small> / ${analysis.participantCount}명</small></strong><em>상위 ${analysis.percentile}%</em></div>
       <div><span>전체 평균</span><strong>${analysis.totalAverage.toFixed(1)}<small>점</small></strong></div>
-      <div><span>응시 상태</span><strong class="pdf-status">${analysis.status}</strong></div>
     </section>
     <section class="pdf-two-columns"><div><h2>과목별 성적 분석</h2>${scoreBarsHtml(analysis.subjects)}</div><div><h2>세부 영역별 성적 분석</h2>${scoreBarsHtml(analysis.areas)}</div></section>
     <section><h2>문항별 분석</h2><div class="pdf-question-grid">${questionTableHtml(analysis.questions)}</div></section>
     <section class="pdf-diagnosis"><h2>과목·영역별 성취도 진단</h2><div>${analysis.diagnostics.map((area) => `<p><b>${escapeHtml(area.name)}</b><em data-level="${escapeHtml(area.level)}">${area.level}</em><span>${escapeHtml(area.message)}</span></p>`).join("")}</div></section>
     <section class="pdf-overall"><b>총평</b><p>${escapeHtml(analysis.overall)}</p></section>
-    <footer><span class="pdf-footer-logo"><img src="${REPORT_LOGO_URL}" alt="한맥국어학원" /></span><span>개별 분석지를 통해 현재 상태를 살펴보고, 오답의 이유를 분석한 뒤 부족한 부분을 보완하세요.</span><b>상담 전화 02-2202-3292 · 수–금 14:00–22:00 · 주말 09:00–22:00</b></footer>
+    <footer><div class="pdf-footer-copy"><span>개별 분석지를 통해 현재 상태를 살펴보고, 오답의 이유를 분석한 뒤 부족한 부분을 보완하세요.</span><b>상담 전화 02-2202-3292 · 수–금 14:00–22:00 · 주말 09:00–22:00</b></div><span class="pdf-footer-logo"><img src="${REPORT_LOGO_URL}" alt="한맥국어학원" /></span></footer>
   </article>`;
 }
 

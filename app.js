@@ -37,6 +37,7 @@ const panelKicker = $("#panel-kicker");
 const panelTitle = $("#panel-title");
 const previewLabel = $("#preview-label");
 const previewTitle = $("#preview-title");
+const previewFormatLabel = $("#preview-format-label");
 const searchInput = $("#student-search");
 const statusFilter = $("#status-filter");
 const comparisonBody = $("#comparison-body");
@@ -58,7 +59,7 @@ const workflowKicker = inlineWorkflowKicker;
 const workflowTitle = inlineWorkflowTitle;
 const workflowBody = inlineWorkflowBody;
 
-let currentMode = "report";
+let currentMode = "form";
 let currentDataset = null;
 let currentComparison = null;
 let currentConfig = [];
@@ -158,6 +159,7 @@ function setMode(mode) {
   panelTitle.textContent = isReport ? "성적표를 만들 파일을 올려주세요" : isCompare ? "이전·현재 주차 파일을 올려주세요" : "Google Forms 퀴즈를 만드세요";
   previewLabel.textContent = isReport ? "완성 예시" : isCompare ? "전체 학생 변화" : "생성 예시";
   previewTitle.textContent = isReport ? "개인 성적표" : isCompare ? "주차별 성적 비교" : "답안 제출 설문";
+  previewFormatLabel.textContent = mode === "form" ? "Google Forms" : "Excel";
   startLabel.textContent = isReport ? "파일 확인하기" : isCompare ? "두 파일 비교하기" : "설문 설정하기";
   updateButtonState();
 }
@@ -286,6 +288,7 @@ function showToast(message) {
 function openWorkflow(kicker, title) {
   workflowKicker.textContent = kicker;
   workflowTitle.textContent = title;
+  restartWorkflowButton.textContent = currentMode === "form" ? "작업 선택으로 돌아가기" : "파일 다시 선택";
   workflowBody.innerHTML = `<div class="loading-state"><span></span><p>엑셀·CSV 파일을 읽고 있습니다.</p></div>`;
   workspace.hidden = true;
   toolShell.classList.add("workflow-active");
@@ -394,7 +397,7 @@ function showCommonSettingsPage(pushHistory = false) {
   commonSettingsPage.hidden = false;
   document.body.classList.add("settings-view");
   openCommonSettingsButton.setAttribute("aria-current", "page");
-  document.title = "공통 설정 | 모의고사 성적 분석";
+  document.title = "공통 설정 | 모의고사 운영 도구";
   if (pushHistory && window.location.hash !== "#settings") history.pushState({ view: "settings" }, "", "#settings");
   window.scrollTo({ top: 0, behavior: "auto" });
 }
@@ -405,7 +408,7 @@ function showMainPage() {
   appMain.hidden = false;
   document.body.classList.remove("settings-view");
   openCommonSettingsButton.removeAttribute("aria-current");
-  document.title = "모의고사 성적 분석";
+  document.title = "모의고사 운영 도구";
   requestAnimationFrame(() => window.scrollTo({ top: mainScrollPosition, behavior: "auto" }));
 }
 
@@ -752,6 +755,8 @@ function formQuestionRowsHtml() {
     <td>${index + 1}</td>
     <td><select class="form-answer"><option value="" disabled hidden ${question.answer ? "" : "selected"}>—</option>${[1, 2, 3, 4, 5].map((choice) => `<option value="${choice}" ${String(question.answer) === String(choice) ? "selected" : ""}>${choice}</option>`).join("")}</select></td>
     <td><input class="form-points" type="number" min="0" max="100" step="1" value="${escapeHtml(question.points)}" /></td>
+    <td><select class="form-subject config-subject"><option value="">선택 안 함</option>${selectOptionsHtml(subjectOptions, question.subject)}</select></td>
+    <td><select class="form-area config-area"><option value="">선택 안 함</option>${selectOptionsHtml(areaOptions, question.area)}</select></td>
   </tr>`).join("");
 }
 
@@ -760,12 +765,6 @@ function renderFormWorkflow() {
   workflowTitle.textContent = formDraft.title || "새 답안 제출 설문";
   const clientConfigured = Boolean(configuredGoogleClientId());
   workflowBody.innerHTML = `
-    <div class="workflow-summary form-summary">
-      <div><span>공개 범위</span><strong>링크 공개</strong><small>Google 로그인 없이 응답</small></div>
-      <div><span>학생 정보</span><strong>5개</strong><small>이름·학교·전화번호·반·시간대</small></div>
-      <div><span>개인정보</span><strong>의사 표시</strong><small>동의 또는 미동의 필수 선택</small></div>
-      <div><span>설정 파일</span><strong>Excel</strong><small>설문 생성과 함께 다운로드</small></div>
-    </div>
     ${clientConfigured ? "" : '<div class="validation-message warn oauth-warning">Google OAuth 클라이언트 ID가 아직 설정되지 않았습니다. 화면 작성과 Excel 검증은 가능하지만 실제 설문 생성 전 <code>VITE_GOOGLE_CLIENT_ID</code> 설정이 필요합니다.</div>'}
     <section class="workflow-section">
       <div class="workflow-section-head"><div><h3>기본 정보</h3><p>개인 Google Drive에 생성될 퀴즈의 이름과 문항 수입니다.</p></div></div>
@@ -775,16 +774,18 @@ function renderFormWorkflow() {
       </div>
     </section>
     <section class="workflow-section">
-      <div class="workflow-section-head"><div><h3>정답과 배점</h3><p>모든 문항은 선택지 1~5의 필수 객관식으로 생성됩니다.</p></div></div>
+      <div class="workflow-section-head"><div><h3>문항 설정</h3><p>정답과 배점은 필수이며, 과목과 세부 영역은 성적 분석을 위한 선택 항목입니다.</p></div></div>
       <div class="bulk-config form-bulk-config">
         <div class="bulk-config-title"><strong>문항 범위 일괄 설정</strong><small>비워둔 항목은 기존 값을 유지합니다.</small></div>
         <label>시작 문항<input id="form-bulk-from" type="number" min="1" max="${formDraft.questions.length}" value="1" /></label>
         <label>끝 문항<input id="form-bulk-to" type="number" min="1" max="${formDraft.questions.length}" value="${formDraft.questions.length}" /></label>
         <label>정답<select id="form-bulk-answer"><option value="">변경 안 함</option>${[1, 2, 3, 4, 5].map((value) => `<option value="${value}">${value}</option>`).join("")}</select></label>
         <label>배점<input id="form-bulk-points" type="number" min="0" max="100" placeholder="변경 안 함" /></label>
+        <label>과목<select id="form-bulk-subject"><option value="">변경 안 함</option>${selectOptionsHtml(subjectOptions, "")}</select></label>
+        <label>세부 영역<select id="form-bulk-area"><option value="">변경 안 함</option>${selectOptionsHtml(areaOptions, "")}</select></label>
         <button class="secondary-button" id="apply-form-bulk" type="button">범위에 적용</button>
       </div>
-      <div class="config-table-wrap form-config-table-wrap"><table class="config-table form-config-table"><thead><tr><th>문항</th><th>정답</th><th>배점</th></tr></thead><tbody>${formQuestionRowsHtml()}</tbody></table></div>
+      <div class="config-table-wrap form-config-table-wrap"><table class="config-table form-config-table"><thead><tr><th>문항</th><th>정답</th><th>배점</th><th>과목 <small>(선택)</small></th><th>세부 영역 <small>(선택)</small></th></tr></thead><tbody>${formQuestionRowsHtml()}</tbody></table></div>
       <div id="form-validation" class="validation-message warn"></div>
     </section>
     <section class="form-create-action">
@@ -800,8 +801,8 @@ function readFormDraftTable() {
   formDraft.questions = $$(".form-config-table tbody tr", workflowBody).map((row) => ({
     answer: $(".form-answer", row).value,
     points: Number($(".form-points", row).value),
-    subject: "",
-    area: "",
+    subject: $(".form-subject", row).value.trim(),
+    area: $(".form-area", row).value.trim(),
   }));
   return formDraft;
 }
@@ -831,11 +832,15 @@ function bindFormWorkflowEvents() {
     const to = Number($("#form-bulk-to", workflowBody).value);
     const answer = $("#form-bulk-answer", workflowBody).value;
     const pointsInput = $("#form-bulk-points", workflowBody).value;
+    const subject = $("#form-bulk-subject", workflowBody).value;
+    const area = $("#form-bulk-area", workflowBody).value;
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > formDraft.questions.length || from > to) return showToast("적용할 문항 범위를 확인해주세요.");
-    if (!answer && pointsInput === "") return showToast("정답이나 배점을 하나 이상 입력해주세요.");
+    if (!answer && pointsInput === "" && !subject && !area) return showToast("적용할 항목을 하나 이상 선택해주세요.");
     for (let index = from - 1; index < to; index += 1) {
       if (answer) formDraft.questions[index].answer = answer;
       if (pointsInput !== "") formDraft.questions[index].points = Number(pointsInput);
+      if (subject) formDraft.questions[index].subject = subject;
+      if (area) formDraft.questions[index].area = area;
     }
     renderFormWorkflow();
     showToast(`${from}번부터 ${to}번 문항에 적용했습니다.`);
