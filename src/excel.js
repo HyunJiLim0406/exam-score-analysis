@@ -584,19 +584,30 @@ export async function exportComparisonWorkbook(comparison, type = "rank") {
       group.push(item);
       byClass.set(className, group);
     });
-    const classTop = [...byClass.entries()]
+    [...byClass.entries()]
       .sort(([a], [b]) => a.localeCompare(b, "ko"))
-      .flatMap(([className, items]) => items.sort((a, b) => b.rankChange - a.rankChange || b.scoreChange - a.scoreChange).slice(0, 5).map((item) => ({ ...item, classGroup: className })));
-    addTopSheet(workbook, used, "반별 등수 변화 TOP5", classTop, subtitle, "등수 변화", true);
+      .forEach(([className, items]) => {
+        const classTop = items
+          .sort((a, b) => b.rankChange - a.rankChange || b.scoreChange - a.scoreChange)
+          .slice(0, 5)
+          .map((item) => ({ ...item, classGroup: className }));
+        addTopSheet(workbook, used, `${className} TOP5`, classTop, subtitle, "등수 변화", true);
+      });
     fileName = "반별_TOP5.xlsx";
+  } else if (type === "weekly-score") {
+    [
+      ["1주차", comparison.previous],
+      ["2주차", comparison.current],
+    ].forEach(([weekLabel, dataset]) => {
+      const scoreTop = weeklyScoreTop(dataset);
+      addWeeklyScoreTopSheet(workbook, used, `${weekLabel} 점수 TOP10`, scoreTop, dataset.fileName);
+    });
+    fileName = "주차별_점수_TOP10.xlsx";
   } else if (type === "week1-score" || type === "week2-score") {
     const isWeekOne = type === "week1-score";
     const weekLabel = isWeekOne ? "1주차" : "2주차";
     const dataset = isWeekOne ? comparison.previous : comparison.current;
-    const scoreTop = [...dataset.submissions]
-      .filter((item) => !item.excluded && item.sourceScore !== null)
-      .sort((a, b) => b.sourceScore - a.sourceScore || a.name.localeCompare(b.name, "ko"))
-      .slice(0, 10);
+    const scoreTop = weeklyScoreTop(dataset);
     addWeeklyScoreTopSheet(workbook, used, `${weekLabel} 점수 TOP10`, scoreTop, dataset.fileName);
     fileName = `${weekLabel}_점수_TOP10.xlsx`;
   } else if (type === "all") {
@@ -609,6 +620,13 @@ export async function exportComparisonWorkbook(comparison, type = "rank") {
   const buffer = await workbook.xlsx.writeBuffer();
   downloadBuffer(buffer, fileName);
   return buffer;
+}
+
+function weeklyScoreTop(dataset) {
+  return [...dataset.submissions]
+    .filter((item) => !item.excluded && item.sourceScore !== null)
+    .sort((a, b) => b.sourceScore - a.sourceScore || a.name.localeCompare(b.name, "ko"))
+    .slice(0, 10);
 }
 
 function addOverallComparisonSheet(workbook, used, matches, subtitle) {

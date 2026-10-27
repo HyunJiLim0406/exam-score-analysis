@@ -174,15 +174,13 @@ test("제공된 두 응답 파일을 파싱하고 비교한다", async (context)
 
   const classWorkbook = new ExcelJS.Workbook();
   await classWorkbook.xlsx.load(await exportComparisonWorkbook(comparison, "class"));
-  assert.deepEqual(classWorkbook.worksheets.map((sheet) => sheet.name), ["반별 등수 변화 TOP5"]);
-  const classSheet = classWorkbook.getWorksheet("반별 등수 변화 TOP5");
-  const classCounts = new Map();
-  for (let row = 5; row <= classSheet.rowCount; row += 1) {
-    const className = classSheet.getRow(row).getCell(2).value;
-    classCounts.set(className, (classCounts.get(className) ?? 0) + 1);
-  }
-  assert.ok([...classCounts.values()].every((count) => count <= 5));
-  assert.deepEqual([...classCounts.keys()].sort(), ["상위 통합", "최상위 통합"]);
+  assert.deepEqual(classWorkbook.worksheets.map((sheet) => sheet.name), ["상위 통합 TOP5", "최상위 통합 TOP5"]);
+  classWorkbook.worksheets.forEach((sheet) => {
+    assert.ok(sheet.rowCount <= 9);
+    const classNames = new Set();
+    for (let row = 5; row <= sheet.rowCount; row += 1) classNames.add(sheet.getRow(row).getCell(2).value);
+    assert.equal(classNames.size, 1);
+  });
 
   const weekOneScoreWorkbook = new ExcelJS.Workbook();
   await weekOneScoreWorkbook.xlsx.load(await exportComparisonWorkbook(comparison, "week1-score"));
@@ -199,6 +197,10 @@ test("제공된 두 응답 파일을 파싱하고 비교한다", async (context)
   assert.ok(weekTwoScoreSheet.rowCount <= 14);
   assert.equal(weekTwoScoreSheet.getRow(4).getCell(5).value, "점수");
   assert.equal(weekTwoScoreSheet.getRow(5).getCell(5).value, Math.max(...comparison.current.submissions.filter((item) => !item.excluded && item.sourceScore !== null).map((item) => item.sourceScore)));
+
+  const weeklyScoreWorkbook = new ExcelJS.Workbook();
+  await weeklyScoreWorkbook.xlsx.load(await exportComparisonWorkbook(comparison, "weekly-score"));
+  assert.deepEqual(weeklyScoreWorkbook.worksheets.map((sheet) => sheet.name), ["1주차 점수 TOP10", "2주차 점수 TOP10"]);
 
   const allWorkbook = new ExcelJS.Workbook();
   await allWorkbook.xlsx.load(await exportComparisonWorkbook(comparison, "all"));

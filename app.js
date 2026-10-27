@@ -922,7 +922,7 @@ function comparisonResultsHtml(comparison) {
         <div class="actual-table-wrap"><table class="actual-table top10-table"><thead><tr><th>순위</th><th>학생</th><th>이전 점수</th><th>현재 점수</th><th>점수 변화</th><th>등수 변화</th></tr></thead><tbody id="class-top-body">${selectedClassRows || '<tr><td colspan="6" class="muted-box">비교할 학생이 없습니다.</td></tr>'}</tbody></table></div>
       </section>
       <section class="result-tab-panel top10-section" data-result-panel="weekly-score-top">
-        <div class="workflow-section-head"><div><span class="section-badge">WEEKLY TOP 10</span><h3>주차별 점수 TOP10</h3></div><div class="class-top-actions"><select id="weekly-top-select" aria-label="주차 선택"><option value="week1-score" ${comparisonScoreWeek === "week1-score" ? "selected" : ""}>1주차</option><option value="week2-score" ${comparisonScoreWeek === "week2-score" ? "selected" : ""}>2주차</option></select><button class="secondary-button result-download" id="weekly-top-download" type="button" data-export-type="${comparisonScoreWeek}">주차별 TOP10 엑셀</button></div></div>
+        <div class="workflow-section-head"><div><span class="section-badge">WEEKLY TOP 10</span><h3>주차별 점수 TOP10</h3></div><div class="class-top-actions"><select id="weekly-top-select" aria-label="주차 선택"><option value="week1-score" ${comparisonScoreWeek === "week1-score" ? "selected" : ""}>1주차</option><option value="week2-score" ${comparisonScoreWeek === "week2-score" ? "selected" : ""}>2주차</option></select><button class="secondary-button result-download" id="weekly-top-download" type="button" data-export-type="weekly-score">1·2주차 TOP10 엑셀</button></div></div>
         <div class="actual-table-wrap"><table class="actual-table top10-table"><thead><tr><th>순위</th><th>학생</th><th>점수</th></tr></thead><tbody id="weekly-top-body">${weeklyTopRows || '<tr><td colspan="3" class="muted-box">선택한 주차의 점수 데이터가 없습니다.</td></tr>'}</tbody></table></div>
       </section>
       <section class="result-tab-panel" data-result-panel="all">
@@ -1051,7 +1051,6 @@ function bindComparisonEvents() {
     comparisonScoreWeek = event.target.value;
     const dataset = comparisonScoreWeek === "week1-score" ? currentComparison.previous : currentComparison.current;
     $("#weekly-top-body", workflowBody).innerHTML = weeklyScoreTopRows(dataset) || '<tr><td colspan="3" class="muted-box">선택한 주차의 점수 데이터가 없습니다.</td></tr>';
-    $("#weekly-top-download", workflowBody).dataset.exportType = comparisonScoreWeek;
   });
   $("#actual-search", workflowBody)?.addEventListener("input", () => { comparisonPage = 1; renderActualComparisonRows(); });
   $("#actual-status", workflowBody)?.addEventListener("change", () => { comparisonPage = 1; renderActualComparisonRows(); });
