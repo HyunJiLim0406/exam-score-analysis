@@ -608,6 +608,12 @@ html[data-theme="dark"] .settings-collection-row { color: var(--ink); border-col
 html[data-theme="dark"] .settings-collection > header { border-color: var(--line); background: #17202c; }
 html[data-theme="dark"] .settings-collection-row > i,
 html[data-theme="dark"] .settings-row-actions button { color: #a9b4c4; border-color: #485566; background: #263241; }
+html[data-theme="dark"] .settings-row-actions button:disabled {
+  color: #596575;
+  border-color: #2c3745;
+  background: #1a2330;
+  cursor: not-allowed;
+}
 html[data-theme="dark"] .settings-collection-row > input { color: var(--ink); }
 html[data-theme="dark"] .validation-message.ok { color: #82d9b2; background: rgba(85, 199, 149, 0.12); }
 html[data-theme="dark"] .validation-message.warn { color: #f0be70; background: rgba(246, 169, 56, 0.12); }
